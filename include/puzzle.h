@@ -4,7 +4,7 @@
 #include <array>
 #include <iomanip>
 #include <iostream>
-#include <ostream>
+#include <sstream>
 
 namespace stp {
 
@@ -14,19 +14,17 @@ class State {
 public:
     State() { Reset(); }
 
-    State(const State& state) {
-        std::copy(state.Data().begin(), state.Data().end(), data_.begin());
-        blank_ = state.blank_;
-    }
+    State(const State&) = default;
 
-    State& operator=(const State& state) {
-        std::copy(state.Data().begin(), state.Data().end(), data_.begin());
-        blank_ = state.blank_;
-        return *this;
-    }
+    State& operator=(const State&) = default;
 
-    template <typename Container, typename T = typename Container::value_type,
-              std::enable_if_t<std::is_convertible_v<T, uint8_t>, uint8_t> = 0>
+    State(State&&) = default;
+
+    State& operator=(State&&) = default;
+
+    template <typename Container,
+              typename = std::enable_if_t<
+                  std::is_convertible_v<typename Container::value_type, uint8_t>, uint8_t>>
     explicit State(const Container& container) {
         if (container.size() != width * height) {
             throw std::invalid_argument("expected a container of size " +
@@ -54,15 +52,17 @@ public:
         blank_ = 0;
     }
 
-    const auto& Data() const { return data_; }
+    auto& Data() const { return data_; }
 
-    const auto& Blank() const { return blank_; }
+    auto Size() const { return data_.size(); }
 
-    bool operator==(const State& other) const { return data_ == other.Data(); }
+    auto& Blank() const { return blank_; }
 
-    bool operator!=(const State& other) const { return !(*this == other); }
+    bool operator==(const State& state) const { return data_ == state.Data(); }
 
-    uint8_t operator[](const uint8_t i) const { return data_[i]; }
+    bool operator!=(const State& state) const { return !(*this == state); }
+
+    auto& operator[](const uint8_t i) const { return data_[i]; }
 
     explicit operator std::string() const {
         std::stringstream ss;
@@ -78,6 +78,10 @@ public:
             ss << std::endl;
         }
         return ss.str();
+    }
+
+    friend std::ostream& operator<<(std::ostream& os, const State& state) {
+        return os << std::string(state);
     }
 
     static uint8_t PosToIdx(const uint8_t row, const uint8_t col) { return row * width + col; }
@@ -96,20 +100,62 @@ private:
     uint8_t blank_{};
 };
 
-template <uint8_t width, uint8_t height>
-std::ostream& operator<<(std::ostream& os, const State<width, height>& state) {
-    return os << std::string(state);
-}
-
 class Action {
 public:
     enum Direction : uint8_t { kLeft, kUp, kRight, kDown, kNoSlide };
+
+    Action() = default;
+
+    Action(const Action&) = default;
+
+    Action& operator=(const Action&) = default;
+
+    Action(Action&&) = default;
+
+    Action& operator=(Action&&) = default;
 
     Action(const Direction direction, const uint8_t times) : direction_(direction), times_(times) {}
 
     [[nodiscard]] auto& GetDirection() const { return direction_; }
 
     [[nodiscard]] auto& Times() const { return times_; }
+
+    friend std::ostream& operator<<(std::ostream& os, const Direction& direction) {
+        switch (direction) {
+            case kLeft:
+                os << "Left";
+                break;
+            case kRight:
+                os << "Right";
+                break;
+            case kUp:
+                os << "Up";
+                break;
+            case kDown:
+                os << "Down";
+                break;
+            default:
+                os << "NoSlide";
+                break;
+        }
+        return os;
+    }
+
+    explicit operator std::string() const {
+        std::stringstream ss;
+        ss << "(" << direction_ << ", " << std::to_string(times_) << ")";
+        return ss.str();
+    }
+
+    friend std::ostream& operator<<(std::ostream& os, const Action& action) {
+        return os << std::string(action);
+    }
+
+    bool operator==(const Action& action) const {
+        return direction_ == action.direction_ && times_ == action.times_;
+    }
+
+    bool operator!=(const Action& action) const { return !(*this == action); }
 
     [[nodiscard]] std::pair<int8_t, int8_t> GetOffset() const {
         switch (direction_) {
@@ -126,7 +172,7 @@ public:
         }
     }
 
-    [[nodiscard]] Action Invert() const {
+    [[nodiscard]] Action Reverse() const {
         switch (direction_) {
             case kLeft:
                 return {kRight, times_};
@@ -141,37 +187,10 @@ public:
         }
     }
 
-    explicit operator std::string() const {
-        std::stringstream ss;
-        switch (direction_) {
-            case kLeft:
-                ss << "(Left, ";
-                break;
-            case kRight:
-                ss << "(Right, ";
-                break;
-            case kUp:
-                ss << "(Up, ";
-                break;
-            case kDown:
-                ss << "(Down, ";
-                break;
-            default:
-                ss << "(NoSlide, ";
-                break;
-        }
-        ss << std::to_string(times_) << ")";
-        return ss.str();
-    }
-
 private:
     Direction direction_ = kNoSlide;
     uint8_t times_ = 1;
 };
-
-inline std::ostream& operator<<(std::ostream& os, const Action& action) {
-    return os << std::string(action);
-}
 
 template <uint8_t width, uint8_t height>
     requires(width > 0 && width <= 16 && height > 0 && height <= 16)
@@ -206,8 +225,8 @@ public:
                 if (col > 0) actions.emplace_back(Action::kLeft, 1);
                 if (row < height - 1) actions.emplace_back(Action::kDown, 1);
                 if (col < width - 1) actions.emplace_back(Action::kRight, 1);
+                actions.shrink_to_fit();
             }
-            actions.shrink_to_fit();
             valid_actions_[blank] = actions;
         }
     }
@@ -234,24 +253,15 @@ public:
 
     bool GoalTest(const State<width, height>& state) const { return state == goal_; }
 
-    void GetActions(const State<width, height>& state, std::vector<Action>& actions) const {
-        for (auto action : valid_actions_[state.Blank()]) {
+    template <typename Container,
+              typename = std::enable_if_t<std::is_same_v<typename Container::value_type, Action>>>
+    void GetActions(const State<width, height>& state, Container& actions) const {
+        actions.reserve(width + height - 2);
+        for (const auto& action : valid_actions_[state.Blank()]) {
             for (uint8_t i = 1; i <= action.Times(); ++i) {
                 actions.emplace_back(action.GetDirection(), i);
             }
         }
-    }
-
-    std::vector<State<width, height>> GetSuccessors(const State<width, height>& state) const {
-        std::vector<State> successors;
-        successors.reserve(12);
-        std::vector<Action> actions;
-        GetActions(state, actions);
-        for (const auto& action : actions) {
-            successors.emplace_back(state);
-            ApplyAction(successors.back(), action);
-        }
-        return successors;
     }
 
     static void ApplyAction(State<width, height>& state, const Action& action) {
@@ -272,7 +282,7 @@ public:
     }
 
     static void UndoAction(State<width, height>& state, const Action& action) {
-        ApplyAction(state, action.Invert());
+        ApplyAction(state, action.Reverse());
     }
 
     unsigned HCost(const State<width, height>& state) const {
@@ -291,6 +301,12 @@ private:
     State goal_{};
     std::array<std::vector<Action>, width * height> valid_actions_{};
     std::array<std::array<uint8_t, width * height>, width * height> distance_{};
+    /**
+     * If it is enabled, up to (width - 1) tiles can be moved in a row,
+     * up to (height - 1) tiles can be moved in a column
+     *
+     * In a 15-puzzle, the branching factor will become 6 when enabled
+     */
     bool enable_bulk_move_;
 };
 }  // namespace stp

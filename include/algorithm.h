@@ -2,6 +2,7 @@
 #define ALGORITHM_H
 
 #include <limits>
+#include <memory_resource>
 
 #include "puzzle.h"
 
@@ -16,38 +17,17 @@ class IDAStar {
 public:
     explicit IDAStar(const Puzzle<width, height>& puzzle) : puzzle_(puzzle) {}
 
-    int Search(int g, const int bound) {
-        const auto& state = path_.back();
-        if (const int f = g + puzzle_.HCost(state); f > bound) {
-            return f;
-        }
-        if (puzzle_.GoalTest(state)) {
-            return kFound;
-        }
-        ++node_expanded_;
-        int min_cost = kInf;
-        for (const auto& successor : puzzle_.GetSuccessors(state)) {
-            if (std::ranges::find(path_, successor) == path_.end()) {
-                path_.push_back(successor);
-                const auto t = Search(g + 1, bound);
-                if (t == kFound) {
-                    return kFound;
-                }
-                if (t < min_cost) {
-                    min_cost = t;
-                }
-                path_.pop_back();
-            }
-        }
-        return min_cost;
-    }
+    auto& Solution() { return solution_path_; }
 
-    bool operator()(const State<width, height>& state) {
-        path_.clear();
-        path_.push_back(state);
+    auto NodeExpanded() { return node_expanded_; }
+
+    bool operator()(State<width, height>& state) {
+        solution_path_.clear();
+        node_expanded_ = 0;
+        solution_path_.emplace_back(state);
         int bound = puzzle_.HCost(state);
         while (true) {
-            const auto t = Search(0, bound);
+            const auto t = Search(state, 0, bound);
             if (t == kFound) {
                 return true;
             }
@@ -58,14 +38,46 @@ public:
         }
     }
 
-    auto Path() const { return path_; }
-
-    auto NodeExpanded() const { return node_expanded_; }
-
 private:
-    const Puzzle<width, height>& puzzle_;
-    std::vector<State<width, height>> path_{};
+    using State = State<width, height>;
+    using Puzzle = Puzzle<width, height>;
+    const Puzzle& puzzle_;
+
+    std::pmr::unsynchronized_pool_resource pool_{};
+    std::deque<State> solution_path_{};
     uint64_t node_expanded_{};
+
+    int Search(State& state, int g, const int bound, const Action& last_action = {}) {
+        if (const int f = g + puzzle_.HCost(state); f > bound) {
+            return f;
+        }
+        if (puzzle_.GoalTest(state)) {
+            return kFound;
+        }
+        ++node_expanded_;
+        int min_cost = kInf;
+        std::pmr::vector<Action> actions(&pool_);
+        puzzle_.GetActions(state, actions);
+        for (const auto& action : actions) {
+            if (action == last_action.Reverse()) {
+                continue;
+            }
+            Puzzle::ApplyAction(state, action);
+            if (std::ranges::find(solution_path_, state) == solution_path_.end()) {
+                solution_path_.emplace_back(state);
+                const auto t = Search(state, g + 1, bound, action);
+                if (t == kFound) {
+                    return kFound;
+                }
+                if (t < min_cost) {
+                    min_cost = t;
+                }
+                solution_path_.pop_back();
+            }
+            Puzzle::UndoAction(state, action);
+        }
+        return min_cost;
+    }
 };
 }  // namespace stp::algorithm
 

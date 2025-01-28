@@ -1,9 +1,6 @@
 #include <gtest/gtest.h>
 
 #include <fstream>
-#include <iostream>
-#include <string>
-#include <vector>
 
 #include "algorithm.h"
 
@@ -52,7 +49,7 @@ protected:
 TEST_P(STPTest, TestInstance) {
     const std::string line = GetParam();
     EXPECT_FALSE(line.empty());
-    const auto state = LoadInstanceFromLine(line);
+    auto state = LoadInstanceFromLine(line);
     std::cout << state << std::endl;
     const auto start = std::chrono::high_resolution_clock::now();
     ASSERT_TRUE(ida_(state));
