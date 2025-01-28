@@ -46,6 +46,7 @@ stp::State<SIZE, SIZE> LoadInstanceFromLine(const std::string& line) {
 class STPTest : public testing::TestWithParam<std::string> {
 protected:
     stp::Puzzle<SIZE, SIZE> puzzle_{};
+    stp::algorithm::IDAStar<SIZE, SIZE> ida_{puzzle_};
 };
 
 TEST_P(STPTest, TestInstance) {
@@ -53,13 +54,13 @@ TEST_P(STPTest, TestInstance) {
     EXPECT_FALSE(line.empty());
     const auto state = LoadInstanceFromLine(line);
     std::cout << state << std::endl;
-    std::vector<stp::State<SIZE, SIZE>> path;
     const auto start = std::chrono::high_resolution_clock::now();
-    ASSERT_TRUE(stp::algorithm::IDAStar(puzzle_, state, path));
+    ASSERT_TRUE(ida_(state));
     const auto end = std::chrono::high_resolution_clock::now();
     const auto duration =
         std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
     std::cout << "Test runtime: " << duration << " ms" << std::endl;
+    std::cout << "Node expanded: " << ida_.NodeExpanded() << std::endl;
 }
 
 INSTANTIATE_TEST_SUITE_P(KORF100, STPTest, testing::ValuesIn(LoadLinesFromFile("data/korf100.txt")),

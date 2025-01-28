@@ -1,23 +1,21 @@
+#include <array>
 #include <chrono>
 #include <iostream>
 #include <random>
-#include <vector>
 
 #include "algorithm.h"
 
-constexpr uint8_t WIDTH = 3;
-constexpr uint8_t HEIGHT = 2;
+constexpr uint8_t WIDTH = 4;
+constexpr uint8_t HEIGHT = 4;
 
 int main() {
-    thread_local std::mt19937 rng(std::random_device{}());
     const auto puzzle = stp::Puzzle<WIDTH, HEIGHT>();
-    auto board = puzzle.Goal().Data();
-    std::ranges::shuffle(board, rng);
+    constexpr auto board = std::array{6, 0, 14, 12, 1, 15, 9, 10, 11, 4, 7, 2, 8, 3, 5, 13};
     const auto state = stp::State<WIDTH, HEIGHT>(board);
     std::cout << state;
-    std::vector<stp::State<WIDTH, HEIGHT>> path;
     const auto start_time = std::chrono::high_resolution_clock::now();
-    const auto ret = stp::algorithm::IDAStar(puzzle, state, path);
+    auto algo = stp::algorithm::IDAStar(puzzle);
+    const auto ret = algo(state);
     const auto end_time = std::chrono::high_resolution_clock::now();
     const auto elapsed_time =
         std::chrono::duration_cast<std::chrono::seconds>(end_time - start_time).count();
@@ -27,8 +25,9 @@ int main() {
         std::cout << "Solution not found!" << std::endl;
     }
     std::cout << "Time elapsed: " << elapsed_time << " seconds" << std::endl;
+    std::cout << "Node expanded: " << algo.NodeExpanded() << std::endl;
     std::cout << "Solution path:" << std::endl;
-    for (const auto& s : path) {
+    for (const auto& s : algo.Path()) {
         std::cout << s << std::endl;
     }
     return 0;
