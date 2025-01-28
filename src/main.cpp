@@ -11,7 +11,7 @@ constexpr uint8_t HEIGHT = 2;
 int main() {
     thread_local std::mt19937 rng(std::random_device{}());
     const auto puzzle = stp::Puzzle<WIDTH, HEIGHT>();
-    auto board = puzzle.goal_.board_;
+    auto board = puzzle.Goal().Data();
     std::ranges::shuffle(board, rng);
     const auto state = stp::State<WIDTH, HEIGHT>(board);
     std::cout << state;

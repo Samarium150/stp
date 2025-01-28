@@ -12,18 +12,15 @@ template <uint8_t width, uint8_t height>
     requires(width > 0 && width <= 16 && height > 0 && height <= 16)
 class State {
 public:
-    std::array<uint8_t, width * height> board_{};
-    uint8_t blank_{};
-
     State() { Reset(); }
 
     State(const State& state) {
-        std::copy(state.board_.begin(), state.board_.end(), board_.begin());
+        std::copy(state.Data().begin(), state.Data().end(), data_.begin());
         blank_ = state.blank_;
     }
 
     State& operator=(const State& state) {
-        std::copy(state.board_.begin(), state.board_.end(), board_.begin());
+        std::copy(state.Data().begin(), state.Data().end(), data_.begin());
         blank_ = state.blank_;
         return *this;
     }
@@ -46,32 +43,36 @@ public:
         if (blank_ == -1) {
             throw std::invalid_argument("no blank tile found");
         }
-        std::copy(container.begin(), container.end(), board_.begin());
+        std::copy(container.begin(), container.end(), data_.begin());
         this->blank_ = static_cast<uint8_t>(blank_);
     }
 
     void Reset() {
-        for (uint8_t i = 0; i < board_.size(); ++i) {
-            board_[i] = i;
+        for (uint8_t i = 0; i < data_.size(); ++i) {
+            data_[i] = i;
         }
         blank_ = 0;
     }
 
-    bool operator==(const State& other) const { return board_ == other.board_; }
+    const auto& Data() const { return data_; }
+
+    const auto& Blank() const { return blank_; }
+
+    bool operator==(const State& other) const { return data_ == other.Data(); }
 
     bool operator!=(const State& other) const { return !(*this == other); }
 
-    uint8_t operator[](const uint8_t i) const { return board_[i]; }
+    uint8_t operator[](const uint8_t i) const { return data_[i]; }
 
     explicit operator std::string() const {
         std::stringstream ss;
         for (uint8_t row = 0; row < height; ++row) {
             for (uint8_t col = 0; col < width; ++col) {
                 ss << std::setw(width);
-                if (auto index = PosToIdx(row, col); board_[index] == 0) {
+                if (auto index = PosToIdx(row, col); data_[index] == 0) {
                     ss << "X";
                 } else {
-                    ss << std::to_string(board_[index]);
+                    ss << std::to_string(data_[index]);
                 }
             }
             ss << std::endl;
@@ -86,81 +87,126 @@ public:
     }
 
     void SwapBlank(uint8_t index) {
-        std::swap(board_[blank_], board_[index]);
+        std::swap(data_[blank_], data_[index]);
         blank_ = index;
     }
+
+private:
+    std::array<uint8_t, width * height> data_{};
+    uint8_t blank_{};
 };
 
 template <uint8_t width, uint8_t height>
-static std::ostream& operator<<(std::ostream& os, const State<width, height>& state) {
+std::ostream& operator<<(std::ostream& os, const State<width, height>& state) {
     return os << std::string(state);
 }
 
-enum Action : uint8_t { kLeft, kUp, kRight, kDown, kNoSlide };
+class Action {
+public:
+    enum Direction : uint8_t { kLeft, kUp, kRight, kDown, kNoSlide };
 
-inline std::pair<int8_t, int8_t> GetOffset(const Action action) {
-    switch (action) {
-        case kLeft:
-            return std::make_pair(0, -1);
-        case kUp:
-            return std::make_pair(-1, 0);
-        case kRight:
-            return std::make_pair(0, 1);
-        case kDown:
-            return std::make_pair(1, 0);
-        default:
-            return std::make_pair(0, 0);
+    Action(const Direction direction, const uint8_t times) : direction_(direction), times_(times) {}
+
+    [[nodiscard]] auto& GetDirection() const { return direction_; }
+
+    [[nodiscard]] auto& Times() const { return times_; }
+
+    [[nodiscard]] std::pair<int8_t, int8_t> GetOffset() const {
+        switch (direction_) {
+            case kLeft:
+                return std::make_pair(0, -1);
+            case kUp:
+                return std::make_pair(-1, 0);
+            case kRight:
+                return std::make_pair(0, 1);
+            case kDown:
+                return std::make_pair(1, 0);
+            default:
+                return std::make_pair(0, 0);
+        }
     }
-}
+
+    [[nodiscard]] Action Invert() const {
+        switch (direction_) {
+            case kLeft:
+                return {kRight, times_};
+            case kRight:
+                return {kLeft, times_};
+            case kUp:
+                return {kDown, times_};
+            case kDown:
+                return {kUp, times_};
+            default:
+                return {direction_, times_};
+        }
+    }
+
+    explicit operator std::string() const {
+        std::stringstream ss;
+        switch (direction_) {
+            case kLeft:
+                ss << "(Left, ";
+                break;
+            case kRight:
+                ss << "(Right, ";
+                break;
+            case kUp:
+                ss << "(Up, ";
+                break;
+            case kDown:
+                ss << "(Down, ";
+                break;
+            default:
+                ss << "(NoSlide, ";
+                break;
+        }
+        ss << std::to_string(times_) << ")";
+        return ss.str();
+    }
+
+private:
+    Direction direction_ = kNoSlide;
+    uint8_t times_ = 1;
+};
 
 inline std::ostream& operator<<(std::ostream& os, const Action& action) {
-    switch (action) {
-        case kLeft:
-            os << "Left";
-            break;
-        case kRight:
-            os << "Right";
-            break;
-        case kUp:
-            os << "Up";
-            break;
-        case kDown:
-            os << "Down";
-            break;
-        default:
-            os << "NoSlide";
-            break;
-    }
-    return os;
+    return os << std::string(action);
 }
 
 template <uint8_t width, uint8_t height>
     requires(width > 0 && width <= 16 && height > 0 && height <= 16)
 class Puzzle {
 public:
-    State<width, height> goal_{};
-    std::array<std::vector<Action>, width * height> valid_actions_{};
-    std::array<std::array<int, width * height>, width * height> distance_{};
-
-    Puzzle() {
+    explicit Puzzle(const bool enable_bulk_move = false) : enable_bulk_move_(enable_bulk_move) {
         GenerateValidActions();
         UpdateDistance();
     }
 
-    explicit Puzzle(const State<width, height>& goal) {
+    explicit Puzzle(const State<width, height>& goal, const bool enable_bulk_move = false)
+        : enable_bulk_move_(enable_bulk_move) {
         GenerateValidActions();
         SetGoal(goal);
     }
 
     void GenerateValidActions() {
-        for (auto blank = 0; blank < width * height; ++blank) {
-            std::vector<Action> actions;
-            actions.reserve(4);
+        for (uint8_t blank = 0; blank < width * height; ++blank) {
             const auto [row, col] = State::IdxToPos(blank);
-            if (row > 0) actions.push_back(kUp);
-            if (col > 0) actions.push_back(kLeft);
-            if (row < height - 1) actions.push_back(kDown);
-            if (col < width - 1) actions.push_back(kRight);
+            std::vector<Action> actions;
+            if (enable_bulk_move_) {
+                actions.reserve(width + height - 2);
+                if (row > 0) actions.emplace_back(Action::kUp, row);
+                if (col > 0) actions.emplace_back(Action::kLeft, col);
+                if (row < height - 1)
+                    actions.emplace_back(Action::kDown, static_cast<uint8_t>(height - row - 1));
+                if (col < width - 1)
+                    actions.emplace_back(Action::kRight, static_cast<uint8_t>(width - col - 1));
+            } else {
+                actions.reserve(4);
+                if (row > 0) actions.emplace_back(Action::kUp, 1);
+                if (col > 0) actions.emplace_back(Action::kLeft, 1);
+                if (row < height - 1) actions.emplace_back(Action::kDown, 1);
+                if (col < width - 1) actions.emplace_back(Action::kRight, 1);
+            }
             actions.shrink_to_fit();
             valid_actions_[blank] = actions;
         }
@@ -178,18 +224,30 @@ public:
                 continue;
             }
             for (uint8_t j = 0; j < width * height; ++j) {
-                distance_[tile][j] =
-                    std::abs(i / width - j / width) + std::abs(i % width - j % width);
+                distance_[tile][j] = static_cast<uint8_t>(std::abs(i / width - j / width) +
+                                                          std::abs(i % width - j % width));
             }
         }
     }
 
+    const auto& Goal() const { return goal_; }
+
     bool GoalTest(const State<width, height>& state) const { return state == goal_; }
+
+    void GetActions(const State<width, height>& state, std::vector<Action>& actions) const {
+        for (auto action : valid_actions_[state.Blank()]) {
+            for (uint8_t i = 1; i <= action.Times(); ++i) {
+                actions.emplace_back(action.GetDirection(), i);
+            }
+        }
+    }
 
     std::vector<State<width, height>> GetSuccessors(const State<width, height>& state) const {
         std::vector<State> successors;
-        successors.reserve(4);
-        for (const auto& action : valid_actions_[state.blank_]) {
+        successors.reserve(12);
+        std::vector<Action> actions;
+        GetActions(state, actions);
+        for (const auto& action : actions) {
             successors.emplace_back(state);
             ApplyAction(successors.back(), action);
         }
@@ -197,17 +255,24 @@ public:
     }
 
     static void ApplyAction(State<width, height>& state, const Action& action) {
-        const auto [row, col] = State::IdxToPos(state.blank_);
-        const auto [row_offset, col_offset] = GetOffset(action);
-        const int16_t new_row = row + row_offset;
-        const int16_t new_col = col + col_offset;
-        if (new_row < 0 || new_row >= height || new_col < 0 || new_col >= width) {
-            std::cerr << "Invalid action: " << action << std::endl;
-            std::cerr << "Current state: " << std::endl << state;
-            return;
+        const auto [row_offset, col_offset] = action.GetOffset();
+        uint8_t index = state.Blank();
+        for (uint8_t i = 0; i < action.Times(); ++i) {
+            const auto [row, col] = State::IdxToPos(index);
+            const int16_t new_row = row + row_offset;
+            const int16_t new_col = col + col_offset;
+            if (new_row < 0 || new_row >= height || new_col < 0 || new_col >= width) {
+                std::cerr << "Invalid action: " << std::string(action) << std::endl;
+                std::cerr << "Current state: " << std::endl << state;
+                return;
+            }
+            index = State::PosToIdx(static_cast<uint8_t>(new_row), static_cast<uint8_t>(new_col));
+            state.SwapBlank(index);
         }
-        const auto new_index = State::PosToIdx(new_row, new_col);
-        state.SwapBlank(new_index);
+    }
+
+    static void UndoAction(State<width, height>& state, const Action& action) {
+        ApplyAction(state, action.Invert());
     }
 
     unsigned HCost(const State<width, height>& state) const {
@@ -223,6 +288,10 @@ public:
 
 private:
     using State = State<width, height>;
+    State goal_{};
+    std::array<std::vector<Action>, width * height> valid_actions_{};
+    std::array<std::array<uint8_t, width * height>, width * height> distance_{};
+    bool enable_bulk_move_;
 };
 }  // namespace stp
 
