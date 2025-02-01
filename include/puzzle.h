@@ -32,9 +32,9 @@ public:
                                         std::to_string(container.size()));
         }
         int16_t blank_ = -1;
-        for (int16_t i = 0; i < container.size(); ++i) {
+        for (std::size_t i = 0; i < container.size(); ++i) {
             if (container[i] == 0) {
-                blank_ = i;
+                blank_ = static_cast<int16_t>(i);
                 break;
             }
         }
