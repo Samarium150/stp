@@ -1,5 +1,5 @@
-#ifndef PUZZLE_H
-#define PUZZLE_H
+#ifndef PUZZLE_H_
+#define PUZZLE_H_
 
 #include <array>
 #include <iomanip>
@@ -22,27 +22,26 @@ public:
 
     State& operator=(State&&) = default;
 
-    template <typename Container,
-              typename = std::enable_if_t<
-                  std::is_convertible_v<typename Container::value_type, uint8_t>, uint8_t>>
-    explicit State(const Container& container) {
+    template <typename C,
+              std::enable_if_t<std::is_convertible_v<typename C::value_type, uint8_t>, bool> = true>
+    explicit State(const C& container) {
         if (container.size() != width * height) {
             throw std::invalid_argument("expected a container of size " +
-                                        std::to_string(width * height) + " instead of " +
-                                        std::to_string(container.size()));
+                                        std::to_string(container.size()) + " instead of " +
+                                        std::to_string(width * height));
         }
-        int16_t blank_ = -1;
-        for (std::size_t i = 0; i < container.size(); ++i) {
+        int16_t blank = -1;
+        for (uint8_t i = 0; i < container.size(); ++i) {
             if (container[i] == 0) {
-                blank_ = static_cast<int16_t>(i);
+                blank = i;
                 break;
             }
         }
-        if (blank_ == -1) {
+        if (blank == -1) {
             throw std::invalid_argument("no blank tile found");
         }
         std::copy(container.begin(), container.end(), data_.begin());
-        this->blank_ = static_cast<uint8_t>(blank_);
+        blank_ = static_cast<uint8_t>(blank);
     }
 
     void Reset() {
@@ -69,7 +68,7 @@ public:
         for (uint8_t row = 0; row < height; ++row) {
             for (uint8_t col = 0; col < width; ++col) {
                 ss << std::setw(width);
-                if (auto index = PosToIdx(row, col); data_[index] == 0) {
+                if (auto index = PosToIdx(row, col); index == blank_) {
                     ss << "X";
                 } else {
                     ss << std::to_string(data_[index]);
@@ -87,7 +86,7 @@ public:
     static uint8_t PosToIdx(const uint8_t row, const uint8_t col) { return row * width + col; }
 
     static std::pair<uint8_t, uint8_t> IdxToPos(const uint8_t idx) {
-        return std::make_pair(idx / width, idx % width);
+        return {idx / width, idx % width};
     }
 
     void SwapBlank(uint8_t index) {
@@ -160,15 +159,15 @@ public:
     [[nodiscard]] std::pair<int8_t, int8_t> GetOffset() const {
         switch (direction_) {
             case kLeft:
-                return std::make_pair(0, -1);
+                return {0, -1};
             case kUp:
-                return std::make_pair(-1, 0);
+                return {-1, 0};
             case kRight:
-                return std::make_pair(0, 1);
+                return {0, 1};
             case kDown:
-                return std::make_pair(1, 0);
+                return {1, 0};
             default:
-                return std::make_pair(0, 0);
+                return {0, 0};
         }
     }
 
@@ -191,6 +190,21 @@ private:
     Direction direction_ = kNoSlide;
     uint8_t times_ = 1;
 };
+
+template <typename>
+struct is_state : std::false_type {};
+
+template <uint8_t width, uint8_t height>
+struct is_state<State<width, height>> : std::true_type {};
+
+template <typename>
+struct is_vector : std::false_type {};
+
+template <typename T, typename Alloc>
+struct is_vector<std::vector<T, Alloc>> : std::true_type {};
+
+template <typename T>
+inline constexpr bool is_vector_v = is_vector<T>::value;
 
 template <uint8_t width, uint8_t height>
     requires(width > 0 && width <= 16 && height > 0 && height <= 16)
@@ -253,9 +267,11 @@ public:
 
     bool GoalTest(const State<width, height>& state) const { return state == goal_; }
 
-    template <typename Container,
-              typename = std::enable_if_t<std::is_same_v<typename Container::value_type, Action>>>
-    void GetActions(const State<width, height>& state, Container& actions) const {
+    template <typename S, typename C,
+              std::enable_if_t<is_state<S>::value && is_vector_v<C> &&
+                                   std::is_same_v<typename C::value_type, Action>,
+                               bool> = true>
+    void GetActions(const S& state, C& actions) const {
         actions.reserve(width + height - 2);
         for (const auto& action : valid_actions_[state.Blank()]) {
             for (uint8_t i = 1; i <= action.Times(); ++i) {
@@ -311,4 +327,4 @@ private:
 };
 }  // namespace stp
 
-#endif  // PUZZLE_H
+#endif  // PUZZLE_H_

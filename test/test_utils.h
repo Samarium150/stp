@@ -1,5 +1,5 @@
-#ifndef TEST_HELPER_H
-#define TEST_HELPER_H
+#ifndef TEST_UTILS_H_
+#define TEST_UTILS_H_
 
 #include <gtest/gtest.h>
 
@@ -17,4 +17,4 @@ extern const std::array<Param, kNumInstances> kInstances;
 
 std::string GenerateTestName(const testing::TestParamInfo<std::size_t>& info);
 
-#endif  // TEST_HELPER_H
+#endif  // TEST_UTILS_H_

@@ -1,4 +1,4 @@
-#include "algorithm.h"
+#include "ida_star.h"
 #include "test_utils.h"
 
 class TestModifiedPuzzle : public testing::TestWithParam<std::size_t> {

@@ -1,7 +1,7 @@
 #include <array>
 #include <iostream>
 
-#include "algorithm.h"
+#include "ida_star.h"
 
 constexpr uint8_t WIDTH = 4;
 constexpr uint8_t HEIGHT = 4;

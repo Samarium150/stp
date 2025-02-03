@@ -1,6 +1,8 @@
-#ifndef ALGORITHM_H
-#define ALGORITHM_H
+#ifndef IDA_STAR_H_
+#define IDA_STAR_H_
 
+#include <deque>
+#include <functional>
 #include <limits>
 #include <memory_resource>
 
@@ -15,7 +17,9 @@ constexpr int kInf = std::numeric_limits<int>::max();
 template <uint8_t width, uint8_t height>
 class IDAStar {
 public:
-    explicit IDAStar(const Puzzle<width, height>& puzzle) : puzzle_(puzzle) {}
+    explicit IDAStar(const Puzzle<width, height>& puzzle) : puzzle_(puzzle) {
+        heuristic_ = [this](const State& state) { return puzzle_.HCost(state); };
+    }
 
     auto& Solution() { return solution_path_; }
 
@@ -29,9 +33,11 @@ public:
         while (true) {
             const auto t = Search(state, 0, bound);
             if (t == kFound) {
+                pool_.release();
                 return true;
             }
             if (t == kInf) {
+                pool_.release();
                 return false;
             }
             bound = t;
@@ -46,9 +52,10 @@ private:
     std::pmr::unsynchronized_pool_resource pool_{};
     std::deque<State> solution_path_{};
     uint64_t node_expanded_{};
+    std::function<int(const State&)> heuristic_ = [](const State&) { return 0; };
 
     int Search(State& state, int g, const int bound, const Action& last_action = {}) {
-        if (const int f = g + puzzle_.HCost(state); f > bound) {
+        if (const int f = g + heuristic_(state); f > bound) {
             return f;
         }
         if (puzzle_.GoalTest(state)) {
@@ -81,4 +88,4 @@ private:
 };
 }  // namespace stp::algorithm
 
-#endif  // ALGORITHM_H
+#endif  // IDA_STAR_H_
