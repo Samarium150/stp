@@ -1,9 +1,10 @@
 #ifndef PUZZLE_H_
 #define PUZZLE_H_
 
-#include <array>
+#include <algorithm>
 #include <iomanip>
 #include <iostream>
+#include <ranges>
 #include <sstream>
 
 namespace stp {
@@ -12,7 +13,13 @@ template <uint8_t width, uint8_t height>
     requires(width > 0 && width <= 16 && height > 0 && height <= 16)
 class State {
 public:
-    State() { Reset(); }
+    explicit State(const bool abstract = false) {
+        if (abstract) {
+            std::ranges::fill(data_, -1);
+        } else {
+            Reset();
+        }
+    }
 
     State(const State&) = default;
 
@@ -22,33 +29,42 @@ public:
 
     State& operator=(State&&) = default;
 
-    template <typename C,
-              std::enable_if_t<std::is_convertible_v<typename C::value_type, uint8_t>, bool> = true>
-    explicit State(const C& container) {
+    template <typename Container,
+              std::enable_if_t<std::is_convertible_v<typename Container::value_type, uint8_t>,
+                               bool> = true>
+    explicit State(const Container& container) {
         if (container.size() != width * height) {
             throw std::invalid_argument("expected a container of size " +
                                         std::to_string(container.size()) + " instead of " +
                                         std::to_string(width * height));
         }
-        int16_t blank = -1;
-        for (uint8_t i = 0; i < container.size(); ++i) {
-            if (container[i] == 0) {
-                blank = i;
-                break;
-            }
+        if (std::ranges::any_of(container,
+                                [](const auto& x) { return x < 0 || x >= width * height; })) {
+            throw std::invalid_argument("expected a container of values in [0, " +
+                                        std::to_string(width * height) + "]");
         }
-        if (blank == -1) {
-            throw std::invalid_argument("no blank tile found");
+        if (auto blank = std::ranges::find(container, 0); blank == container.end()) {
+            throw std::invalid_argument("blank tile not found in the container");
+        } else {
+            blank_ = static_cast<uint8_t>(std::distance(container.begin(), blank));
         }
         std::copy(container.begin(), container.end(), data_.begin());
-        blank_ = static_cast<uint8_t>(blank);
     }
 
     void Reset() {
-        for (uint8_t i = 0; i < data_.size(); ++i) {
-            data_[i] = i;
+        for (int16_t i = 0; i < static_cast<int16_t>(data_.size()); ++i) {
+            data_[static_cast<std::size_t>(i)] = i;
         }
         blank_ = 0;
+    }
+
+    bool UpdateBlankPosition() noexcept {
+        if (auto blank = std::ranges::find(data_, 0); blank == data_.end()) {
+            return false;
+        } else {
+            blank_ = static_cast<uint8_t>(std::distance(data_.begin(), blank));
+            return true;
+        }
     }
 
     auto& Data() const { return data_; }
@@ -63,13 +79,17 @@ public:
 
     auto& operator[](const uint8_t i) const { return data_[i]; }
 
+    auto& operator[](const uint8_t i) { return data_[i]; }
+
     explicit operator std::string() const {
         std::stringstream ss;
         for (uint8_t row = 0; row < height; ++row) {
             for (uint8_t col = 0; col < width; ++col) {
                 ss << std::setw(width);
-                if (auto index = PosToIdx(row, col); index == blank_) {
+                if (auto index = PosToIdx(row, col); index == blank_ && data_[index] == 0) {
                     ss << "X";
+                } else if (data_[index] == -1) {
+                    ss << "*";
                 } else {
                     ss << std::to_string(data_[index]);
                 }
@@ -95,7 +115,7 @@ public:
     }
 
 private:
-    std::array<uint8_t, width * height> data_{};
+    std::array<int16_t, width * height> data_{};
     uint8_t blank_{};
 };
 
@@ -191,21 +211,6 @@ private:
     uint8_t times_ = 1;
 };
 
-template <typename>
-struct is_state : std::false_type {};
-
-template <uint8_t width, uint8_t height>
-struct is_state<State<width, height>> : std::true_type {};
-
-template <typename>
-struct is_vector : std::false_type {};
-
-template <typename T, typename Alloc>
-struct is_vector<std::vector<T, Alloc>> : std::true_type {};
-
-template <typename T>
-inline constexpr bool is_vector_v = is_vector<T>::value;
-
 template <uint8_t width, uint8_t height>
     requires(width > 0 && width <= 16 && height > 0 && height <= 16)
 class Puzzle {
@@ -224,24 +229,23 @@ public:
     void GenerateValidActions() {
         for (uint8_t blank = 0; blank < width * height; ++blank) {
             const auto [row, col] = State::IdxToPos(blank);
-            std::vector<Action> actions;
+            auto& actions = valid_actions_[blank];
             if (enable_bulk_move_) {
                 actions.reserve(width + height - 2);
-                if (row > 0) actions.emplace_back(Action::kUp, row);
-                if (col > 0) actions.emplace_back(Action::kLeft, col);
-                if (row < height - 1)
+                if (row > 0 && height > 1) actions.emplace_back(Action::kUp, row);
+                if (col > 0 && width > 1) actions.emplace_back(Action::kLeft, col);
+                if (row < height - 1 && height > 1)
                     actions.emplace_back(Action::kDown, static_cast<uint8_t>(height - row - 1));
-                if (col < width - 1)
+                if (col < width - 1 && width > 1)
                     actions.emplace_back(Action::kRight, static_cast<uint8_t>(width - col - 1));
             } else {
                 actions.reserve(4);
-                if (row > 0) actions.emplace_back(Action::kUp, 1);
-                if (col > 0) actions.emplace_back(Action::kLeft, 1);
-                if (row < height - 1) actions.emplace_back(Action::kDown, 1);
-                if (col < width - 1) actions.emplace_back(Action::kRight, 1);
+                if (row > 0 && height > 1) actions.emplace_back(Action::kUp, 1);
+                if (col > 0 && width > 1) actions.emplace_back(Action::kLeft, 1);
+                if (row < height - 1 && height > 1) actions.emplace_back(Action::kDown, 1);
+                if (col < width - 1 && width > 1) actions.emplace_back(Action::kRight, 1);
                 actions.shrink_to_fit();
             }
-            valid_actions_[blank] = actions;
         }
     }
 
@@ -252,26 +256,23 @@ public:
 
     void UpdateDistance() {
         for (uint8_t i = 0; i < width * height; ++i) {
-            auto tile = goal_[i];
-            if (tile == 0) {
-                continue;
-            }
-            for (uint8_t j = 0; j < width * height; ++j) {
-                distance_[tile][j] = static_cast<uint8_t>(std::abs(i / width - j / width) +
-                                                          std::abs(i % width - j % width));
+            if (const auto tile = goal_[i]; tile != 0) {
+                for (uint8_t j = 0; j < width * height; ++j) {
+                    distance_[static_cast<std::size_t>(tile)][j] =
+                        Pack(static_cast<uint8_t>(std::abs(i / width - j / width)),
+                             static_cast<uint8_t>(std::abs(i % width - j % width)));
+                }
             }
         }
     }
 
-    const auto& Goal() const { return goal_; }
+    auto& Goal() const { return goal_; }
 
     bool GoalTest(const State<width, height>& state) const { return state == goal_; }
 
-    template <typename S, typename C,
-              std::enable_if_t<is_state<S>::value && is_vector_v<C> &&
-                                   std::is_same_v<typename C::value_type, Action>,
-                               bool> = true>
-    void GetActions(const S& state, C& actions) const {
+    template <typename Allocator>
+    void GetActions(const State<width, height>& state,
+                    std::vector<Action, Allocator>& actions) const noexcept {
         actions.reserve(width + height - 2);
         for (const auto& action : valid_actions_[state.Blank()]) {
             for (uint8_t i = 1; i <= action.Times(); ++i) {
@@ -280,43 +281,70 @@ public:
         }
     }
 
-    static void ApplyAction(State<width, height>& state, const Action& action) {
+    unsigned ApplyAction(State<width, height>& state, const Action& action,
+                         const bool dry_run = false) const noexcept {
         const auto [row_offset, col_offset] = action.GetOffset();
         uint8_t index = state.Blank();
-        for (uint8_t i = 0; i < action.Times(); ++i) {
-            const auto [row, col] = State::IdxToPos(index);
-            const int16_t new_row = row + row_offset;
-            const int16_t new_col = col + col_offset;
-            if (new_row < 0 || new_row >= height || new_col < 0 || new_col >= width) {
-                std::cerr << "Invalid action: " << std::string(action) << std::endl;
-                std::cerr << "Current state: " << std::endl << state;
-                return;
-            }
-            index = State::PosToIdx(static_cast<uint8_t>(new_row), static_cast<uint8_t>(new_col));
-            state.SwapBlank(index);
+        auto [row, col] = State::IdxToPos(index);
+        int16_t new_row = row + row_offset * action.Times();
+        int16_t new_col = col + col_offset * action.Times();
+        if (new_row < 0 || new_row >= height || new_col < 0 || new_col >= width) {
+            std::cerr << "Invalid action: " << std::string(action) << std::endl;
+            std::cerr << "Current state: " << std::endl << state;
+            return std::numeric_limits<unsigned>::max();
         }
+        unsigned tile_with_cost = 0;
+        for (uint8_t i = 0; i < action.Times(); ++i) {
+            new_row = row + row_offset;
+            new_col = col + col_offset;
+            index = State::PosToIdx(static_cast<uint8_t>(new_row), static_cast<uint8_t>(new_col));
+            tile_with_cost += (state[index] != -1) ? 1 : 0;
+            if (!dry_run) {
+                state.SwapBlank(index);
+            }
+            std::tie(row, col) = State::IdxToPos(index);
+        }
+        return abstraction_has_edge_cost_ || !enable_bulk_move_
+                   ? edge_cost_ * tile_with_cost
+                   : edge_cost_ / action.Times() * tile_with_cost;
     }
 
-    static void UndoAction(State<width, height>& state, const Action& action) {
+    void UndoAction(State<width, height>& state, const Action& action) const noexcept {
         ApplyAction(state, action.Reverse());
     }
 
-    unsigned HCost(const State<width, height>& state) const {
-        auto h = 0u;
+    unsigned HCost(const State<width, height>& state) const noexcept {
+        auto r = 0u;
+        auto c = 0u;
         for (uint8_t i = 0; i < width * height; ++i) {
-            const auto& tile = state[i];
-            if (tile != 0) {
-                h += distance_[tile][i];
+            if (const auto tile = state[i]; tile != 0) {
+                const auto [row_dist, col_dist] =
+                    Unpack(distance_[static_cast<std::size_t>(tile)][i]);
+                r += row_dist;
+                c += col_dist;
             }
         }
-        return h;
+        return enable_bulk_move_ ? (r / (height - 1) + c / (width - 1)) * edge_cost_
+                                 : (r + c) * edge_cost_;
     }
+
+    bool abstraction_has_edge_cost_ = false;
 
 private:
     using State = State<width, height>;
+    using Distance = uint8_t;
+
+    static Distance Pack(const uint8_t x, const uint8_t y) noexcept {
+        return (x & 0x0F) | (y << 4);
+    }
+
+    static std::pair<uint8_t, uint8_t> Unpack(const Distance entry) noexcept {
+        return {entry & 0x0F, entry >> 4};
+    }
+
     State goal_{};
     std::array<std::vector<Action>, width * height> valid_actions_{};
-    std::array<std::array<uint8_t, width * height>, width * height> distance_{};
+    std::array<std::array<Distance, width * height>, width * height> distance_{};
     /**
      * If it is enabled, up to (width - 1) tiles can be moved in a row,
      * up to (height - 1) tiles can be moved in a column
@@ -324,6 +352,7 @@ private:
      * In a 15-puzzle, the branching factor will become 6 when enabled
      */
     bool enable_bulk_move_;
+    unsigned edge_cost_ = enable_bulk_move_ ? 6u : 1u;
 };
 }  // namespace stp
 

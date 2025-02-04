@@ -2,6 +2,7 @@
 #include <iostream>
 
 #include "ida_star.h"
+#include "pdb.h"
 
 constexpr uint8_t WIDTH = 4;
 constexpr uint8_t HEIGHT = 4;
@@ -10,12 +11,22 @@ using State = stp::State<WIDTH, HEIGHT>;
 using Puzzle = stp::Puzzle<WIDTH, HEIGHT>;
 
 int main() {
-    const auto puzzle = Puzzle();
+    auto puzzle = Puzzle();
     constexpr auto board = std::array{14, 13, 15, 7, 11, 12, 9, 5, 6, 0, 2, 1, 4, 8, 10, 3};
     auto start = State(board);
     std::cout << start;
-    const auto start_time = std::chrono::high_resolution_clock::now();
     auto algo = stp::algorithm::IDAStar(puzzle);
+    // auto pdb1 =
+    //     stp::algorithm::PatternDatabase(puzzle, std::vector<uint8_t>{0, 1, 2, 3, 4, 5, 6, 7});
+    // auto pdb2 = stp::algorithm::PatternDatabase(
+    //     puzzle, std::vector<uint8_t>{0, 8, 9, 10, 11, 12, 13, 14, 15});
+    // auto pdb_h = stp::algorithm::AdditivePDBHeuristic<WIDTH, HEIGHT>();
+    // pdb1.Build();
+    // pdb2.Build();
+    // pdb_h.Add(pdb1);
+    // pdb_h.Add(pdb2);
+    // algo.Heuristic() = [&](const State& state) { return pdb_h.HCost(state); };
+    const auto start_time = std::chrono::high_resolution_clock::now();
     const auto ret = algo(start);
     const auto end_time = std::chrono::high_resolution_clock::now();
     const auto elapsed_time =

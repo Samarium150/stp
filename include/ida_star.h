@@ -10,28 +10,30 @@
 
 namespace stp::algorithm {
 
-constexpr int kFound = -1;
+constexpr auto kFound = -1;
 
-constexpr int kInf = std::numeric_limits<int>::max();
+constexpr auto kInf = std::numeric_limits<int>::max();
 
 template <uint8_t width, uint8_t height>
 class IDAStar {
 public:
-    explicit IDAStar(const Puzzle<width, height>& puzzle) : puzzle_(puzzle) {
-        heuristic_ = [this](const State& state) { return puzzle_.HCost(state); };
-    }
+    explicit IDAStar(const Puzzle<width, height>& puzzle)
+        : puzzle_(puzzle),
+          heuristic_([this](const State& state) { return puzzle_.HCost(state); }) {}
 
     auto& Solution() { return solution_path_; }
 
     auto NodeExpanded() { return node_expanded_; }
 
+    auto& Heuristic() { return heuristic_; }
+
     bool operator()(State<width, height>& state) {
         solution_path_.clear();
         node_expanded_ = 0;
         solution_path_.emplace_back(state);
-        int bound = puzzle_.HCost(state);
+        auto bound = heuristic_(state);
         while (true) {
-            const auto t = Search(state, 0, bound);
+            const auto t = Search(state, 0u, bound);
             if (t == kFound) {
                 pool_.release();
                 return true;
@@ -52,10 +54,11 @@ private:
     std::pmr::unsynchronized_pool_resource pool_{};
     std::deque<State> solution_path_{};
     uint64_t node_expanded_{};
-    std::function<int(const State&)> heuristic_ = [](const State&) { return 0; };
+    std::function<unsigned(const State&)> heuristic_ = [](const State&) { return 0; };
 
-    int Search(State& state, int g, const int bound, const Action& last_action = {}) {
-        if (const int f = g + heuristic_(state); f > bound) {
+    int Search(State& state, const unsigned g, const unsigned bound,
+               const Action& last_action = {}) {
+        if (const int f = g + heuristic_(state); f > static_cast<int>(bound)) {
             return f;
         }
         if (puzzle_.GoalTest(state)) {
@@ -69,10 +72,10 @@ private:
             if (action == last_action.Reverse()) {
                 continue;
             }
-            Puzzle::ApplyAction(state, action);
+            const auto edge_cost = puzzle_.ApplyAction(state, action);
             if (std::ranges::find(solution_path_, state) == solution_path_.end()) {
                 solution_path_.emplace_back(state);
-                const auto t = Search(state, g + 1, bound, action);
+                const auto t = Search(state, g + edge_cost, bound, action);
                 if (t == kFound) {
                     return kFound;
                 }
@@ -81,7 +84,7 @@ private:
                 }
                 solution_path_.pop_back();
             }
-            Puzzle::UndoAction(state, action);
+            puzzle_.UndoAction(state, action);
         }
         return min_cost;
     }
