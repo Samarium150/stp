@@ -1,4 +1,3 @@
-include(FetchContent)
 FetchContent_Declare(GoogleTest
   GIT_REPOSITORY "https://github.com/google/googletest"
   GIT_TAG main
@@ -20,11 +19,11 @@ endif()
 
 add_executable(test_standard_puzzle test_standard_puzzle.cpp ${UTILS} ${HEADERS})
 target_include_directories(test_standard_puzzle PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(test_standard_puzzle PRIVATE GTest::gtest_main)
+target_link_libraries(test_standard_puzzle PRIVATE GTest::gtest_main concurrentqueue)
 
 add_executable(test_modified_puzzle test_modified_puzzle.cpp ${UTILS} ${HEADERS})
 target_include_directories(test_modified_puzzle PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(test_modified_puzzle PRIVATE GTest::gtest_main)
+target_link_libraries(test_modified_puzzle PRIVATE GTest::gtest_main concurrentqueue)
 
 include(GoogleTest)
 gtest_discover_tests(test_standard_puzzle)
