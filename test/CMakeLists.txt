@@ -9,7 +9,11 @@ enable_testing()
 
 file(GLOB UTILS ${CMAKE_CURRENT_SOURCE_DIR}/test_utils.*)
 
-file(GLOB UTILS ${CMAKE_CURRENT_SOURCE_DIR}/test_utils.*)
+file(GLOB TESTS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/test_*.cpp)
+
+file(GLOB UTILS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/test_utils.*)
+
+list(FILTER TESTS EXCLUDE REGEX "utils")
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     target_compile_options(gtest PRIVATE "-w")
@@ -17,14 +21,11 @@ elseif (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     target_compile_options(gtest PRIVATE "/w")
 endif()
 
-add_executable(test_standard_puzzle test_standard_puzzle.cpp ${UTILS} ${HEADERS})
-target_include_directories(test_standard_puzzle PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(test_standard_puzzle PRIVATE GTest::gtest_main concurrentqueue)
-
-add_executable(test_modified_puzzle test_modified_puzzle.cpp ${UTILS} ${HEADERS})
-target_include_directories(test_modified_puzzle PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(test_modified_puzzle PRIVATE GTest::gtest_main concurrentqueue)
-
 include(GoogleTest)
-gtest_discover_tests(test_standard_puzzle)
-gtest_discover_tests(test_modified_puzzle)
+foreach (TEST_SOURCE_FILE ${TESTS})
+    get_filename_component(name ${TEST_SOURCE_FILE} NAME_WE)
+    add_executable(${name} ${TEST_SOURCE_FILE} ${UTILS} ${HEADERS})
+    target_include_directories(${name} PRIVATE ${CMAKE_SOURCE_DIR}/include)
+    target_link_libraries(${name} PRIVATE GTest::gtest_main concurrentqueue)
+    gtest_discover_tests(${name})
+endforeach()

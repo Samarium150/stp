@@ -29,9 +29,8 @@ public:
         }
         pattern_.assign(pattern.begin(), pattern.end());
         const uint16_t factorial_base = width * height;
-        const auto expected_size = FactorialUpperK(factorial_base, factorial_base - pattern_size);
-        std::cout << "expected pdb size: " << expected_size << std::endl;
-        db_.Resize(expected_size, std::numeric_limits<uint64_t>::max());
+        db_.Resize(FactorialUpperK(factorial_base, factorial_base - pattern_size),
+                   std::numeric_limits<uint64_t>::max());
     }
 
     PatternDatabase(const PatternDatabase& pdb)
@@ -337,6 +336,8 @@ private:
 template <uint8_t width, uint8_t height>
 class AdditivePDBHeuristic {
 public:
+    auto& PDBs() { return pattern_dbs_; }
+
     void Add(PatternDatabase<width, height>& pdb) { pattern_dbs_.push_back(pdb); }
 
     unsigned HCost(const State<width, height>& state) {
