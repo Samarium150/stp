@@ -266,6 +266,20 @@ public:
     unsigned HCost(const State<width, height>& state) const { return db_.Get(GetPDBHash(state)); }
 
 private:
+    /**
+     * One of the linear time ranking functions
+     * designed by Wendy Myrvold and Frank Ruskey in their paper
+     * [Ranking and unranking permutations in linear time]
+     * @tparam C1 Container type for the dual
+     * @tparam C2 Container type for the locations
+     * @tparam C3 Container type for the values
+     * @param state the state to rank
+     * @param dual the cache for the `dual` representation of the abstract state
+     * @param locations the cache for store indices of pattern tiles
+     * @param values the cache for the `swapped` index
+     * @return the rank of the state
+     * @see https://doi.org/10.1016/S0020-0190(01)00141-7
+     */
     template <typename C1, typename C2, typename C3>
     uint64_t Ranking(const State<width, height>& state, C1& dual, C2& locations,
                      C3& values) const noexcept {
@@ -299,6 +313,16 @@ private:
         return hash;
     }
 
+    /**
+     * One of the linear time unranking functions
+     * designed by Wendy Myrvold and Frank Ruskey in their paper
+     * [Ranking and unranking permutations in linear time]
+     * @tparam Container type for the dual
+     * @param hash the hash for unranking
+     * @param state the output state
+     * @param dual the cache for the `dual` representation of the abstract state
+     * @see https://doi.org/10.1016/S0020-0190(01)00141-7
+     */
     template <typename Container>
     void UnRanking(uint64_t hash, State<width, height>& state, Container& dual) const noexcept {
         const auto puzzle_size = static_cast<uint16_t>(state.Size());

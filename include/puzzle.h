@@ -347,7 +347,9 @@ private:
      * If it is enabled, up to (width - 1) tiles can be moved in a row,
      * up to (height - 1) tiles can be moved in a column
      *
-     * In a 15-puzzle, the branching factor will become 6 when enabled
+     * In a 15-puzzle the asymptotic branching factor will become 6
+     * instead of 2.1304 when enabled
+     * @see https://doi.org/10.1016/S0004-3702(01)00094-7
      */
     bool enable_bulk_move_;
     unsigned edge_cost_ = enable_bulk_move_ ? 6u : 1u;
