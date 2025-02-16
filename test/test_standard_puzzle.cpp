@@ -16,7 +16,7 @@ TEST_P(TestStandardPuzzle, TestInstance) {
     const auto end = std::chrono::high_resolution_clock::now();
     const auto duration =
         std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-    const auto solution_length = ida_.Solution().size() - 1;
+    const auto solution_length = ida_.Solution().size();
     ASSERT_EQ(solution_length, length);
     std::cout << "Time elapsed: " << duration << " ms" << std::endl;
     std::cout << "Solution length: " << solution_length << std::endl;

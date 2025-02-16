@@ -170,9 +170,7 @@ public:
         return os << std::string(action);
     }
 
-    bool operator==(const Action& action) const {
-        return direction_ == action.direction_ && times_ == action.times_;
-    }
+    bool operator==(const Action& action) const { return direction_ == action.direction_; }
 
     bool operator!=(const Action& action) const { return !(*this == action); }
 
@@ -354,6 +352,14 @@ private:
     bool enable_bulk_move_;
     unsigned edge_cost_ = enable_bulk_move_ ? 6u : 1u;
 };
+
+namespace algorithm {
+
+constexpr auto kFound = -1;
+
+constexpr auto kInf = std::numeric_limits<int>::max();
+
+}  // namespace algorithm
 }  // namespace stp
 
 #endif  // PUZZLE_H_
