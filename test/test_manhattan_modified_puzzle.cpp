@@ -23,4 +23,4 @@ TEST_P(TestModifiedPuzzle, TestInstance) {
 }
 
 INSTANTIATE_TEST_SUITE_P(KORF100, TestModifiedPuzzle,
-                         ::testing::Range<std::size_t>(0, kNumInstances - 1), GenerateTestName);
+                         ::testing::Range<std::size_t>(0, kNumInstances), GenerateTestName);

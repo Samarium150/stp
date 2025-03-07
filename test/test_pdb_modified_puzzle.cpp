@@ -68,4 +68,4 @@ TEST_P(TestPDBModifiedPuzzle, TestInstance) {
 }
 
 INSTANTIATE_TEST_SUITE_P(KORF100, TestPDBModifiedPuzzle,
-                         ::testing::Range<std::size_t>(0, kNumInstances - 1), GenerateTestName);
+                         ::testing::Range<std::size_t>(0, kNumInstances), GenerateTestName);
