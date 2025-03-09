@@ -103,5 +103,5 @@ const auto kInstances = std::array<Param, kNumInstances>{
      {{11, 4, 0, 8, 6, 10, 5, 13, 12, 7, 14, 3, 1, 2, 9, 15}, 54}}};
 
 std::string GenerateTestName(const testing::TestParamInfo<std::size_t>& info) {
-    return std::string("Puzzle") + std::to_string(info.index);
+    return std::string("Puzzle") + std::to_string(info.index + 1);
 }
