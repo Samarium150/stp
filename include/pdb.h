@@ -31,39 +31,15 @@ public:
                    std::numeric_limits<uint64_t>::max());
     }
 
-    PatternDatabase(const PatternDatabase& pdb)
-        : puzzle_(pdb.GetPuzzle()), pattern_(pdb.Pattern()), db_(pdb.DB()) {}
+    PatternDatabase(const PatternDatabase&) noexcept = default;
 
-    PatternDatabase& operator=(const PatternDatabase& pdb) {
-        puzzle_ = pdb.GetPuzzle();
-        pattern_ = pdb.Pattern();
-        db_ = pdb.DB();
-        return *this;
-    }
+    PatternDatabase& operator=(const PatternDatabase&) noexcept = default;
 
-    PatternDatabase(PatternDatabase&& pdb) noexcept
-        : puzzle_(pdb.GetPuzzle()), pattern_(std::move(pdb.Pattern())), db_(std::move(pdb.DB())) {}
+    PatternDatabase(PatternDatabase&& pdb) noexcept = default;
 
-    PatternDatabase& operator=(PatternDatabase&& pdb) noexcept {
-        puzzle_ = pdb.GetPuzzle();
-        pattern_ = std::move(pdb.Pattern());
-        db_ = std::move(pdb.DB());
-        return *this;
-    }
+    PatternDatabase& operator=(PatternDatabase&& pdb) noexcept = default;
 
-    auto& GetPuzzle() { return puzzle_.get(); }
-
-    auto& GetPuzzle() const { return puzzle_.get(); }
-
-    auto& Pattern() const { return pattern_; }
-
-    auto& DB() const { return db_; }
-
-    auto& DB() { return db_; }
-
-    auto Size() const { return db_.Size(); }
-
-    void BuildSeq(const bool is_additive = true) {
+    void BuildSeq(const bool is_additive = true) noexcept {
         auto& puzzle = puzzle_.get();
         puzzle.abstraction_has_edge_cost_ = !is_additive;
 
@@ -76,7 +52,7 @@ public:
         std::array<std::deque<uint64_t>, MAX_COST + 1> buckets;
         buckets[0].push_back(goal);
 
-        std::size_t visited = 1;
+        size_t visited = 1;
         for (uint8_t current_cost = 0; current_cost <= MAX_COST && visited < size; ++current_cost) {
             auto& bucket = buckets[current_cost];
             while (!bucket.empty()) {
@@ -113,13 +89,13 @@ public:
         }
     }
 
-    void Build(const bool is_additive = true) {
+    void Build(const bool is_additive = true) noexcept {
         auto& puzzle = puzzle_.get();
         puzzle.abstraction_has_edge_cost_ = !is_additive;
 
         constexpr auto MAX_COST = std::numeric_limits<uint8_t>::max();
         const auto size = db_.Size();
-        constexpr std::size_t CHUNK_SIZE = 4096;
+        constexpr size_t CHUNK_SIZE = 4096;
         const auto num_thread = std::thread::hardware_concurrency();
 
         std::array<std::vector<std::atomic_bool>, MAX_COST + 1> buckets;
@@ -138,13 +114,13 @@ public:
         std::barrier barrier(num_thread + 1);
         for (uint8_t current_cost = 0; current_cost <= MAX_COST && visited < size; ++current_cost) {
             auto& bucket = buckets[current_cost];
-            for (std::size_t i = 0; i < size; i += CHUNK_SIZE) {
+            for (size_t i = 0; i < size; i += CHUNK_SIZE) {
                 if (bucket[i / CHUNK_SIZE].load(std::memory_order_relaxed)) {
                     tasks.enqueue({i, std::min(size, i + CHUNK_SIZE)});
                 }
             }
             bucket.clear();
-            for (std::size_t i = 0; i < num_thread; ++i) {
+            for (size_t i = 0; i < num_thread; ++i) {
                 threads.emplace_back([this, &buckets, &tasks, &visited, current_cost, &barrier] {
                     uint64_t count = 0;
                     std::vector<std::pair<uint64_t, uint8_t>> successors;
@@ -210,7 +186,7 @@ public:
         }
     }
 
-    static uint64_t FactorialUpperK(const unsigned n, const unsigned k) {
+    static uint64_t FactorialUpperK(const unsigned n, const unsigned k) noexcept {
         uint64_t value = 1;
         for (auto i = n; i > k; --i) {
             value *= i;
@@ -218,7 +194,7 @@ public:
         return value;
     }
 
-    unsigned HCost(const State<width, height>& state) const {
+    [[nodiscard]] unsigned HCost(const State<width, height>& state) const noexcept {
         return db_.Get(util::Ranking(state, pattern_));
     }
 
@@ -235,11 +211,11 @@ private:
 template <uint8_t width, uint8_t height>
 class AdditivePDBHeuristic {
 public:
-    auto& PDBs() { return pattern_dbs_; }
+    auto& PDBs() noexcept { return pattern_dbs_; }
 
-    void Add(PatternDatabase<width, height>& pdb) { pattern_dbs_.push_back(pdb); }
+    void Add(PatternDatabase<width, height>& pdb) noexcept { pattern_dbs_.push_back(pdb); }
 
-    unsigned HCost(const State<width, height>& state) {
+    [[nodiscard]] unsigned HCost(const State<width, height>& state) const noexcept {
         return std::accumulate(
             pattern_dbs_.begin(), pattern_dbs_.end(), 0u,
             [&state](const auto& h, const auto& pdb) { return h + pdb.HCost(state); });
@@ -248,6 +224,7 @@ public:
 private:
     std::vector<PatternDatabase<width, height>> pattern_dbs_{};
 };
+
 }  // namespace stp::algorithm
 
 #endif  // PDB_H_

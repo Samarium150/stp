@@ -14,16 +14,16 @@ namespace stp::algorithm {
 template <uint8_t width, uint8_t height>
 class ParallelIDAStar {
 public:
-    explicit ParallelIDAStar(const Puzzle<width, height>& puzzle)
+    explicit ParallelIDAStar(const Puzzle<width, height>& puzzle) noexcept
         : puzzle_(puzzle),
           heuristic_([this](const State& state) { return puzzle_.get().HCost(state); }),
           num_threads_(std::thread::hardware_concurrency()) {}
 
-    auto& Solution() { return solution_path_; }
+    auto& Solution() const noexcept { return solution_path_; }
 
-    auto NodeExpanded() const { return node_expanded_.load(); }
+    auto NodeExpanded() const noexcept { return node_expanded_.load(); }
 
-    void SetHeuristic(std::function<unsigned(const State<width, height>&)> heuristic) {
+    void SetHeuristic(std::function<unsigned(const State<width, height>&)> heuristic) noexcept {
         heuristic_ = std::move(heuristic);
     }
 
@@ -57,13 +57,13 @@ public:
         std::barrier barrier(num_threads_ + 1);
         Queue tasks;
         while (true) {
-            for (std::size_t i = 0; i < tasks_units_.size(); ++i) {
+            for (size_t i = 0; i < tasks_units_.size(); ++i) {
                 tasks.enqueue(i);
             }
 
             for (auto i = 0u; i < std::thread::hardware_concurrency(); ++i) {
                 threads.emplace_back([this, state, bound, &tasks, &barrier] {
-                    std::size_t index;
+                    size_t index;
                     while (!solution_found_.load(std::memory_order_relaxed) &&
                            tasks.try_dequeue(index)) {
                         auto& task = tasks_units_[index];
@@ -108,24 +108,7 @@ public:
 private:
     using State = State<width, height>;
     using Puzzle = Puzzle<width, height>;
-    using Queue = moodycamel::ConcurrentQueue<std::size_t>;
-
-    std::reference_wrapper<const Puzzle> puzzle_;
-
-    std::function<unsigned(const State&)> heuristic_ = [](const State&) { return 0; };
-    std::size_t num_threads_;
-    std::deque<Action> solution_path_;
-    std::atomic_bool solution_found_{false};
-    std::atomic_uint64_t node_expanded_{0};
-
-    static constexpr int init_task_depth_ = 5;
-
-    struct Task {
-        std::array<Action, init_task_depth_> init_actions{};
-        std::deque<Action> solution{};
-        int next_bound = kInf;
-    };
-    std::vector<Task> tasks_units_;
+    using Queue = moodycamel::ConcurrentQueue<size_t>;
 
     void InitTasks(State& state, std::deque<Action>& path, const Action& last_action = {},
                    const unsigned depth = 0) noexcept {
@@ -184,6 +167,23 @@ private:
         }
         return min_cost;
     }
+
+    static constexpr int init_task_depth_ = 5;
+
+    struct Task {
+        std::array<Action, init_task_depth_> init_actions{};
+        std::deque<Action> solution{};
+        int next_bound = kInf;
+    };
+    std::vector<Task> tasks_units_;
+
+    std::reference_wrapper<const Puzzle> puzzle_;
+
+    std::function<unsigned(const State&)> heuristic_ = [](const State&) { return 0; };
+    size_t num_threads_;
+    std::deque<Action> solution_path_;
+    std::atomic_bool solution_found_{false};
+    std::atomic_uint64_t node_expanded_{0};
 };
 }  // namespace stp::algorithm
 

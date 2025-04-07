@@ -30,7 +30,7 @@ uint64_t Ranking(const State<width, height>& state,
     const auto puzzle_size = static_cast<uint16_t>(state.Size());
     for (auto i = 0; i < puzzle_size; ++i) {
         if (state[i] != -1) {
-            dual[static_cast<std::size_t>(state[i])] = static_cast<uint8_t>(i);
+            dual[static_cast<size_t>(state[i])] = static_cast<uint8_t>(i);
         }
     }
     const auto pattern_size = static_cast<uint16_t>(pattern.size());
@@ -84,6 +84,7 @@ void UnRanking(uint64_t hash, State<width, height>& state,
     }
     state.UpdateBlankPosition();
 }
+
 }  // namespace stp::util
 
 #endif  // RANKING_H_

@@ -12,15 +12,15 @@ namespace stp::algorithm {
 template <uint8_t width, uint8_t height>
 class IDAStar {
 public:
-    explicit IDAStar(const Puzzle<width, height>& puzzle)
+    explicit IDAStar(const Puzzle<width, height>& puzzle) noexcept
         : puzzle_(puzzle),
           heuristic_([this](const State& state) { return puzzle_.get().HCost(state); }) {}
 
-    auto& Solution() { return solution_path_; }
+    auto& Solution() const noexcept { return solution_path_; }
 
-    auto NodeExpanded() { return node_expanded_; }
+    auto NodeExpanded() const noexcept { return node_expanded_; }
 
-    void SetHeuristic(std::function<unsigned(const State<width, height>&)> heuristic) {
+    void SetHeuristic(std::function<unsigned(const State<width, height>&)> heuristic) noexcept {
         heuristic_ = std::move(heuristic);
     }
 

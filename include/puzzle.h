@@ -13,21 +13,13 @@ template <uint8_t width, uint8_t height>
     requires(width > 0 && width <= 16 && height > 0 && height <= 16)
 class State {
 public:
-    explicit State(const bool abstract = false) {
+    explicit State(const bool abstract = false) noexcept {
         if (abstract) {
             std::ranges::fill(data_, -1);
         } else {
             Reset();
         }
     }
-
-    State(const State&) = default;
-
-    State& operator=(const State&) = default;
-
-    State(State&&) = default;
-
-    State& operator=(State&&) = default;
 
     template <typename Container,
               std::enable_if_t<std::is_convertible_v<typename Container::value_type, uint8_t>,
@@ -51,9 +43,17 @@ public:
         std::copy(container.begin(), container.end(), data_.begin());
     }
 
-    void Reset() {
+    State(const State&) noexcept = default;
+
+    State& operator=(const State&) noexcept = default;
+
+    State(State&&) noexcept = default;
+
+    State& operator=(State&&) noexcept = default;
+
+    void Reset() noexcept {
         for (int16_t i = 0; i < static_cast<int16_t>(data_.size()); ++i) {
-            data_[static_cast<std::size_t>(i)] = i;
+            data_[static_cast<size_t>(i)] = i;
         }
         blank_ = 0;
     }
@@ -67,21 +67,21 @@ public:
         }
     }
 
-    auto& Data() const { return data_; }
+    [[nodiscard]] auto& Data() const noexcept { return data_; }
 
-    auto Size() const { return data_.size(); }
+    [[nodiscard]] auto Size() const noexcept { return data_.size(); }
 
-    auto& Blank() const { return blank_; }
+    [[nodiscard]] auto& Blank() const noexcept { return blank_; }
 
-    bool operator==(const State& state) const { return data_ == state.Data(); }
+    bool operator==(const State& state) const noexcept { return data_ == state.data_; }
 
-    bool operator!=(const State& state) const { return !(*this == state); }
+    bool operator!=(const State& state) const noexcept { return !(*this == state); }
 
-    auto& operator[](const uint8_t i) const { return data_[i]; }
+    auto& operator[](const uint8_t i) const noexcept { return data_[i]; }
 
-    auto& operator[](const uint8_t i) { return data_[i]; }
+    auto& operator[](const uint8_t i) noexcept { return data_[i]; }
 
-    explicit operator std::string() const {
+    explicit operator std::string() const noexcept {
         std::stringstream ss;
         for (uint8_t row = 0; row < height; ++row) {
             for (uint8_t col = 0; col < width; ++col) {
@@ -99,17 +99,19 @@ public:
         return ss.str();
     }
 
-    friend std::ostream& operator<<(std::ostream& os, const State& state) {
+    friend std::ostream& operator<<(std::ostream& os, const State& state) noexcept {
         return os << std::string(state);
     }
 
-    static uint8_t PosToIdx(const uint8_t row, const uint8_t col) { return row * width + col; }
+    static uint8_t PosToIdx(const uint8_t row, const uint8_t col) noexcept {
+        return row * width + col;
+    }
 
-    static std::pair<uint8_t, uint8_t> IdxToPos(const uint8_t idx) {
+    static std::pair<uint8_t, uint8_t> IdxToPos(const uint8_t idx) noexcept {
         return {idx / width, idx % width};
     }
 
-    void SwapBlank(uint8_t index) {
+    void SwapBlank(uint8_t index) noexcept {
         std::swap(data_[blank_], data_[index]);
         blank_ = index;
     }
@@ -123,23 +125,23 @@ class Action {
 public:
     enum Direction : uint8_t { kLeft, kUp, kRight, kDown, kNoSlide };
 
-    Action() = default;
-
-    Action(const Action&) = default;
-
-    Action& operator=(const Action&) = default;
-
-    Action(Action&&) = default;
-
-    Action& operator=(Action&&) = default;
+    Action() noexcept = default;
 
     Action(const Direction direction, const uint8_t times) : direction_(direction), times_(times) {}
 
-    [[nodiscard]] auto& GetDirection() const { return direction_; }
+    Action(const Action&) noexcept = default;
 
-    [[nodiscard]] auto& Times() const { return times_; }
+    Action& operator=(const Action&) noexcept = default;
 
-    friend std::ostream& operator<<(std::ostream& os, const Direction& direction) {
+    Action(Action&&) noexcept = default;
+
+    Action& operator=(Action&&) noexcept = default;
+
+    [[nodiscard]] auto& GetDirection() const noexcept { return direction_; }
+
+    [[nodiscard]] auto& Times() const noexcept { return times_; }
+
+    friend std::ostream& operator<<(std::ostream& os, const Direction& direction) noexcept {
         switch (direction) {
             case kLeft:
                 os << "Left";
@@ -160,21 +162,21 @@ public:
         return os;
     }
 
-    explicit operator std::string() const {
+    explicit operator std::string() const noexcept {
         std::stringstream ss;
         ss << "(" << direction_ << ", " << std::to_string(times_) << ")";
         return ss.str();
     }
 
-    friend std::ostream& operator<<(std::ostream& os, const Action& action) {
+    friend std::ostream& operator<<(std::ostream& os, const Action& action) noexcept {
         return os << std::string(action);
     }
 
-    bool operator==(const Action& action) const { return direction_ == action.direction_; }
+    bool operator==(const Action& action) const noexcept { return direction_ == action.direction_; }
 
-    bool operator!=(const Action& action) const { return !(*this == action); }
+    bool operator!=(const Action& action) const noexcept { return !(*this == action); }
 
-    [[nodiscard]] std::pair<int8_t, int8_t> GetOffset() const {
+    [[nodiscard]] std::pair<int8_t, int8_t> GetOffset() const noexcept {
         switch (direction_) {
             case kLeft:
                 return {0, -1};
@@ -189,7 +191,7 @@ public:
         }
     }
 
-    [[nodiscard]] Action Reverse() const {
+    [[nodiscard]] Action Reverse() const noexcept {
         switch (direction_) {
             case kLeft:
                 return {kRight, times_};
@@ -213,18 +215,19 @@ template <uint8_t width, uint8_t height>
     requires(width > 0 && width <= 16 && height > 0 && height <= 16)
 class Puzzle {
 public:
-    explicit Puzzle(const bool enable_bulk_move = false) : enable_bulk_move_(enable_bulk_move) {
+    explicit Puzzle(const bool enable_bulk_move = false) noexcept
+        : enable_bulk_move_(enable_bulk_move) {
         GenerateValidActions();
         UpdateDistance();
     }
 
-    explicit Puzzle(const State<width, height>& goal, const bool enable_bulk_move = false)
+    explicit Puzzle(const State<width, height>& goal, const bool enable_bulk_move = false) noexcept
         : enable_bulk_move_(enable_bulk_move) {
         GenerateValidActions();
         SetGoal(goal);
     }
 
-    void GenerateValidActions() {
+    void GenerateValidActions() noexcept {
         for (uint8_t blank = 0; blank < width * height; ++blank) {
             const auto [row, col] = State::IdxToPos(blank);
             auto& actions = valid_actions_[blank];
@@ -247,16 +250,16 @@ public:
         }
     }
 
-    void SetGoal(const State<width, height>& goal) {
+    void SetGoal(const State<width, height>& goal) noexcept {
         goal_ = goal;
         UpdateDistance();
     }
 
-    void UpdateDistance() {
+    void UpdateDistance() noexcept {
         for (uint8_t i = 0; i < width * height; ++i) {
             if (const auto tile = goal_[i]; tile != 0) {
                 for (uint8_t j = 0; j < width * height; ++j) {
-                    distance_[static_cast<std::size_t>(tile)][j] =
+                    distance_[static_cast<size_t>(tile)][j] =
                         Pack(static_cast<uint8_t>(std::abs(i / width - j / width)),
                              static_cast<uint8_t>(std::abs(i % width - j % width)));
                 }
@@ -264,9 +267,11 @@ public:
         }
     }
 
-    auto& Goal() const { return goal_; }
+    [[nodiscard]] auto& Goal() const noexcept { return goal_; }
 
-    bool GoalTest(const State<width, height>& state) const { return state == goal_; }
+    [[nodiscard]] bool GoalTest(const State<width, height>& state) const noexcept {
+        return state == goal_;
+    }
 
     template <typename Allocator>
     void GetActions(const State<width, height>& state,
@@ -296,7 +301,7 @@ public:
             new_row = row + row_offset;
             new_col = col + col_offset;
             index = State::PosToIdx(static_cast<uint8_t>(new_row), static_cast<uint8_t>(new_col));
-            tile_with_cost += (state[index] != -1) ? 1 : 0;
+            tile_with_cost += state[index] != -1 ? 1 : 0;
             if (!dry_run) {
                 state.SwapBlank(index);
             }
@@ -311,13 +316,12 @@ public:
         ApplyAction(state, action.Reverse());
     }
 
-    unsigned HCost(const State<width, height>& state) const noexcept {
+    [[nodiscard]] unsigned HCost(const State<width, height>& state) const noexcept {
         auto r = 0u;
         auto c = 0u;
         for (uint8_t i = 0; i < width * height; ++i) {
             if (const auto tile = state[i]; tile != 0) {
-                const auto [row_dist, col_dist] =
-                    Unpack(distance_[static_cast<std::size_t>(tile)][i]);
+                const auto [row_dist, col_dist] = Unpack(distance_[static_cast<size_t>(tile)][i]);
                 r += row_dist;
                 c += col_dist;
             }
@@ -333,6 +337,7 @@ private:
     using Distance = uint8_t;
 
     static Distance Pack(const uint8_t x, const uint8_t y) noexcept {
+        // NOLINTNEXTLINE
         return (x & 0x0F) | (y << 4);
     }
 

@@ -9,26 +9,26 @@ namespace stp::algorithm {
 template <uint8_t width, uint8_t height>
 class AStar {
 public:
-    explicit AStar(const Puzzle<width, height>& puzzle)
+    explicit AStar(const Puzzle<width, height>& puzzle) noexcept
         : puzzle_(puzzle),
           heuristic_([this](const State& state) { return puzzle_.get().HCost(state); }) {}
 
-    auto& Solution() { return solution_path_; }
+    auto& Solution() const noexcept { return solution_path_; }
 
-    auto NodeExpanded() { return node_expanded_; }
+    auto NodeExpanded() const noexcept { return node_expanded_; }
 
-    void SetHeuristic(std::function<unsigned(const State<width, height>&)> heuristic) {
+    void SetHeuristic(std::function<unsigned(const State<width, height>&)> heuristic) noexcept {
         heuristic_ = std::move(heuristic);
     }
 
-    void SetPhi(std::function<unsigned(unsigned h, unsigned g)> phi) { phi_ = std::move(phi); }
+    void SetPhi(std::function<unsigned(unsigned, unsigned)> phi) noexcept { phi_ = std::move(phi); }
 
     bool operator()(State<width, height>& state) noexcept {
         const auto puzzle = puzzle_.get();
         if (puzzle.GoalTest(state)) {
             return true;
         }
-        std::priority_queue<Node, std::vector<Node>, CompareNode> open;
+        std::priority_queue<Node, std::vector<Node>, std::greater<>> open;
         std::unordered_map<uint64_t, unsigned> closed;
         std::unordered_map<uint64_t, std::pair<uint64_t, Action>> came_from;
         std::vector<Action> actions;
@@ -83,7 +83,7 @@ private:
     std::reference_wrapper<const Puzzle> puzzle_;
 
     std::function<unsigned(const State&)> heuristic_ = [](const State&) { return 0; };
-    std::function<unsigned(unsigned h, unsigned g)> phi_ = [](const unsigned h, const unsigned g) {
+    std::function<unsigned(unsigned, unsigned)> phi_ = [](const unsigned h, const unsigned g) {
         return g + h;
     };
 
@@ -94,9 +94,8 @@ private:
         uint64_t rank{};
         unsigned g{};
         unsigned f{};
-    };
-    struct CompareNode {
-        bool operator()(const Node& a, const Node& b) { return a.f > b.f; }
+
+        bool operator>(const Node& other) const { return f > other.f; }
     };
 };
 }  // namespace stp::algorithm
